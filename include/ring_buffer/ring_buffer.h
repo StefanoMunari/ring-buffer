@@ -22,7 +22,7 @@ struct RingBuffer {
 	addr_t *buffer;
 	// size of buffer in bytes
 	addr_t buffer_size;
-} __attribute__((aligned(sizeof(addr_t))));
+} __attribute__((packed, aligned(sizeof(addr_t))));
 
 extern const uint32_t WORD_SIZE;
 extern const struct RingBuffer RING_BUFFER_INVALID;
@@ -31,12 +31,18 @@ struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
                                              addr_t *base_addr, uint32_t size);
 
 /**
- * creates a ring buffer from a chunk of contiguous memory
+ * creates a ring buffer from a chunk of allocated contiguous memory
  * @param base_addr base address of memory chunk
  * @param size size of memory chunk
  * @return a ring buffer instance, RING_BUFFER_INVALID (buffer_size = 0) if fail
  */
 struct RingBuffer make_ring_buffer_linear(addr_t *base_addr, uint32_t size);
+
+/**
+ * reset a ring buffer w/out deallocating mem which is not owned by ring buffer
+ * @param ring_buffer the buffer to reset
+ */
+void reset_ring_buffer(struct RingBuffer *ring_buffer);
 
 /**
  * write size data into ring_buffer from cwrite_i position

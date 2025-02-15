@@ -43,7 +43,7 @@ struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
                                              addr_t *base_addr, uint32_t size)
 {
 	if (cwrite_i == NULL || cread_i == NULL || base_addr == NULL || size <
-	    WORD_SIZE * 2)
+		WORD_SIZE * 2)
 		return RING_BUFFER_INVALID;
 	return (struct RingBuffer){
 		.
@@ -73,6 +73,11 @@ struct RingBuffer make_ring_buffer_linear(addr_t *base_addr, uint32_t size)
 	};
 }
 
+void reset_ring_buffer(struct RingBuffer *ring_buffer)
+{
+	memset(ring_buffer, 0x00, sizeof(struct RingBuffer));
+}
+
 int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
 	// read info
@@ -88,29 +93,31 @@ int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 		return -1; // invalid buffer
 	if (wcycle != rcycle && wi == ri)
 		return 0; // buffer is full
+	if (size > ring_buffer->buffer_size)
+		size = ring_buffer->buffer_size;// write at most buffer_size
 
-	const addr_t wend_i = wi + size - 1;
+	const addr_t unwrapped_wsize = wi + size;
 	addr_t write_addr = (addr_t)ring_buffer->buffer + wi;
 
-	addr_t cend_i = wend_i % ring_buffer->buffer_size;
-	if (cend_i != wend_i) {
-		// wrapped/cycled
+	addr_t cend_i = unwrapped_wsize % ring_buffer->buffer_size;
+	if (cend_i > 0 && cend_i != unwrapped_wsize) {// wrapped/cycled
 		if (wcycle != rcycle && cend_i > ri) {
-			// capped by read index
-			cend_i = ri;
+			cend_i = ri;// capped by read index
 		}
-		const addr_t half =
+		const addr_t first_chunk =
 			size - (ring_buffer->buffer_size - wi);
-		memcpy((void *)write_addr, data, half);
-		memcpy(ring_buffer->buffer, &data[half],
+		memcpy((void *)write_addr, data, first_chunk);
+		memcpy(ring_buffer->buffer, &data[first_chunk],
 		       cend_i);
 		// update cycle write index
-		ring_buffer->cwrite_i = (addr_t *)(cend_i | CYCLE_MASK);
-		return half + cend_i;
+		*(ring_buffer->cwrite_i) = cend_i % ring_buffer->buffer_size  | CYCLE_MASK;
+		return first_chunk + cend_i;
 	}
+	if (wi != ri && wi + size > ri)
+		size = ri;// capped by read index
 	memcpy((void *)write_addr, data, size);
 	// update cycle write index
-	ring_buffer->cwrite_i += ((wi + size) & ~CYCLE_MASK);
+	*(ring_buffer->cwrite_i) += ((wi + size) % ring_buffer->buffer_size & ~CYCLE_MASK);
 	return size;
 }
 
@@ -129,27 +136,29 @@ int32_t read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 		return -1; // invalid buffer
 	if (ring_buffer->cread_i == ring_buffer->cwrite_i)
 		return 0; // buffer is empty
+	if (size > ring_buffer->buffer_size)
+		size = ring_buffer->buffer_size;// read at most buffer_size
 
-	const addr_t rend_i = ri + size - 1;
+	const addr_t unwrapped_rsize = ri + size;
 	addr_t read_addr = (addr_t)ring_buffer->buffer + ri;
 
-	addr_t cend_i = rend_i % ring_buffer->buffer_size;
-	if (cend_i != rend_i) {
-		// wrapped/cycled
+	addr_t cend_i = unwrapped_rsize % ring_buffer->buffer_size;
+	if (cend_i > 0 && cend_i != unwrapped_rsize) {// wrapped/cycled
 		if (rcycle != wcycle && cend_i > wi) {
-			// capped by write index
-			cend_i = wi;
+			cend_i = wi;// capped by write index
 		}
-		const addr_t half =
+		const addr_t first_chunk =
 			size - (ring_buffer->buffer_size - ri);
-		memcpy(data, (void *)read_addr, half);
-		memcpy(&data[half], ring_buffer->buffer, cend_i);
+		memcpy(data, (void *)read_addr, first_chunk);
+		memcpy(&data[first_chunk], ring_buffer->buffer, cend_i);
 		// update cycle read index
-		ring_buffer->cread_i = (addr_t *)(cend_i | CYCLE_MASK);
-		return half + cend_i;
+		*(ring_buffer->cread_i) = cend_i % ring_buffer->buffer_size | CYCLE_MASK;
+		return first_chunk + cend_i;
 	}
+	if (wi != ri && ri + size > wi)
+		size = wi;// capped by write index
 	memcpy(data, (void *)read_addr, size);
 	// update cycle read index
-	ring_buffer->cread_i += ((ri + size) & ~CYCLE_MASK);
+	*(ring_buffer->cread_i) += (ri + size) % ring_buffer->buffer_size & ~CYCLE_MASK;
 	return size;
 }
