@@ -1,0 +1,10 @@
+# reference: https://clang.llvm.org/docs/MemorySanitizer.html
+function(target_use_mem_sanitizer target enable)
+    if (NOT ${enable})
+        return()
+    endif()
+    message(STATUS "${target} compiled with address sanitizer")
+    set(SANITIZER_FLAGS -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
+    target_compile_options(${target} PUBLIC ${SANITIZER_FLAGS})
+    target_link_options(${target} PUBLIC ${SANITIZER_FLAGS})
+endfunction()
