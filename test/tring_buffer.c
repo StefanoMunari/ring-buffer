@@ -43,46 +43,37 @@ void trbuf_ctor_scattered_fail(void) {
   TEST_ASSERT_EQUAL_MEMORY(&rbs, &RING_BUFFER_INVALID, sizeof(rbs));
 }
 
-void trbuf_write_read_bigbuffer0(void) {
+static void _rbuf_write_read_bigbuffer(const int msg_size) {
+  char expected_msg[rb.buffer_size];
+  memset(expected_msg, 0x42, rb.buffer_size);
   // WRITE
-  const int msg_size = mem_size*3;
   char msg[msg_size];
   memset(msg, 0x42, msg_size);
   int32_t result = write(&rb, msg, msg_size);
   TEST_ASSERT_EQUAL(result, rb.buffer_size);
   // READ
-  char expected_msg[rb.buffer_size];
-  memset(expected_msg, 0x42, rb.buffer_size);
   memset(msg, 0x00, msg_size);
   result = read(&rb, msg, msg_size);
   TEST_ASSERT_EQUAL(result, rb.buffer_size);
   TEST_ASSERT_EQUAL_MEMORY(expected_msg, msg, rb.buffer_size);
+}
+
+void trbuf_write_read_bigbuffer0(void) {
+  _rbuf_write_read_bigbuffer(mem_size*3);
 }
 
 void trbuf_write_read_bigbuffer1(void) {
-  // WRITE
-  const int msg_size = mem_size*3 - 3;
-  char msg[msg_size];
-  memset(msg, 0x42, msg_size);
-  int32_t result = write(&rb, msg, msg_size);
-  TEST_ASSERT_EQUAL(result, rb.buffer_size);
-  // READ
-  char expected_msg[rb.buffer_size];
-  memset(expected_msg, 0x42, rb.buffer_size);
-  memset(msg, 0x00, msg_size);
-  result = read(&rb, msg, msg_size);
-  TEST_ASSERT_EQUAL(result, rb.buffer_size);
-  TEST_ASSERT_EQUAL_MEMORY(expected_msg, msg, rb.buffer_size);
+  _rbuf_write_read_bigbuffer(mem_size*3 - 3);
 }
 
 void trbuf_write_read_notwrapped(void) {
+  char expected_msg[] = "Hello World!";
   // WRITE
   char msg[] = "Hello World!";
   const int msg_size = strlen(msg);
   int32_t result = write(&rb, msg, msg_size);
   TEST_ASSERT_EQUAL(result, msg_size);
   // READ
-  char expected_msg[] = "Hello World!";
   memset(msg, 0, msg_size);
   result = read(&rb, msg, msg_size);
   TEST_ASSERT_EQUAL(result, msg_size);
