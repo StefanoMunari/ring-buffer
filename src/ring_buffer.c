@@ -78,7 +78,12 @@ void reset_ring_buffer(struct RingBuffer *ring_buffer)
 	memset(ring_buffer, 0x00, sizeof(struct RingBuffer));
 }
 
-int32_t _transfer(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, addr_t *cy_index, uint8_t *data, uint32_t size, int write) {
+typedef void (*Copy)(void *x_addr, uint8_t *data, uint32_t size);
+typedef void (*CopyWrapped)(addr_t *buffer, void *x_addr, uint8_t *data, const addr_t first_chunk, addr_t cend_i);
+
+int32_t _transfer(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, addr_t *cy_index, uint8_t *data,
+	uint32_t size, Copy cp_cback, CopyWrapped cp_wrp_cback)
+{
 	// y info: the index which handles the other transfer op type
 	const addr_t cy_addr = *(cy_index);
 	const uint8_t ycycle = _cycle(cy_addr);
@@ -101,27 +106,26 @@ int32_t _transfer(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, ad
 		}
 		const addr_t first_chunk =
 			size - (buffer_size - xi);
-		if (write) {
-			memcpy((void *)x_addr, data, first_chunk);
-			memcpy(buffer, &data[first_chunk], cend_i);
-		} else {
-			memcpy(data, (void *)x_addr, first_chunk);
-			memcpy(&data[first_chunk], buffer, cend_i);
-		}
+		cp_wrp_cback(buffer, (void *)x_addr, data, first_chunk, cend_i);
 		// update cycle x index
 		*(cx_index) = cend_i % buffer_size | CYCLE_MASK;
 		return first_chunk + cend_i;
 	}
 	if (xi != yi && xi + size > yi)
 		size = yi;// capped by y index
-	if (write) {
-		memcpy((void *)x_addr, data, size);
-	} else {
-		memcpy(data, (void *)x_addr, size);
-	}
+	cp_cback((void *)x_addr, data, size);
 	// update cycle x index
 	*(cx_index) += ((xi + size) % buffer_size & ~CYCLE_MASK);
 	return size;
+}
+
+void _copy_write(void *x_addr, uint8_t *data, uint32_t size) {
+	memcpy(x_addr, data, size);
+}
+
+void _copy_write_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr_t first_chunk, addr_t cend_i) {
+	memcpy(x_addr, data, first_chunk);
+	memcpy(buffer, &data[first_chunk], cend_i);
 }
 
 int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
@@ -140,7 +144,17 @@ int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 	if (wcycle != rcycle && wi == ri)
 		return 0; // buffer is full
 	// x = write, y = read
-	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cwrite_i, ring_buffer->cread_i, data, size, 1);
+	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cwrite_i, ring_buffer->cread_i, data,
+		size, _copy_write, _copy_write_wrapped);
+}
+
+void _copy_read(void *x_addr, uint8_t *data, uint32_t size) {
+	memcpy(data, x_addr, size);
+}
+
+void _copy_read_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr_t first_chunk, addr_t cend_i) {
+	memcpy(data, x_addr, first_chunk);
+	memcpy(&data[first_chunk], buffer, cend_i);
 }
 
 int32_t read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
@@ -159,5 +173,6 @@ int32_t read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 	if (ring_buffer->cread_i == ring_buffer->cwrite_i)
 		return 0; // buffer is empty
 	// x = read, y = write
-	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cread_i, ring_buffer->cwrite_i, data, size, 0);
+	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cread_i, ring_buffer->cwrite_i, data,
+		size, _copy_read, _copy_read_wrapped);
 }
