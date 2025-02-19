@@ -14,9 +14,9 @@ set(RBUFF_CMEM_SANITIZER "ON" CACHE BOOL "")
 #=============================
 # Tools
 #=============================
-include(cmake/tools/clang_sanitizer.cmake)
-include(cmake/tools/clang_tidy.cmake)
-include(cmake/tools/test.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/tools/clang_sanitizer.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/tools/clang_tidy.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/tools/test.cmake)
 #=============================
 # Targets
 #=============================
@@ -24,6 +24,6 @@ set(RBUFF_LIB ring_buff)
 set(RBUFF_HEADERS include/)
 file(GLOB_RECURSE SOURCES "src/*.c")
 add_library(${RBUFF_LIB} ${SOURCES})
-target_include_directories(${RBUFF_LIB} PUBLIC ${RBUFF_HEADERS})
+target_include_directories(${RBUFF_LIB} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/${RBUFF_HEADERS})
 
-include(cmake/targets/ring_buffer_test.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/ring_buffer_test.cmake)

@@ -39,7 +39,7 @@ static uint8_t _cycle(addr_t addr)
 }
 
 // public interface
-struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
+struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
                                              addr_t *base_addr, uint32_t size)
 {
 	if (cwrite_i == NULL || cread_i == NULL || base_addr == NULL || size <
@@ -57,7 +57,7 @@ struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
 	};
 }
 
-struct RingBuffer make_ring_buffer_linear(addr_t *base_addr, uint32_t size)
+struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size)
 {
 	if (base_addr == NULL || size < (LIN_BUFFER_OFFSET + WORD_SIZE * 2))
 		return RING_BUFFER_INVALID;
@@ -73,7 +73,7 @@ struct RingBuffer make_ring_buffer_linear(addr_t *base_addr, uint32_t size)
 	};
 }
 
-void reset_ring_buffer(struct RingBuffer *ring_buffer)
+void ring_buffer_reset(struct RingBuffer *ring_buffer)
 {
 	memset(ring_buffer, 0x00, sizeof(struct RingBuffer));
 }
@@ -128,7 +128,7 @@ void _copy_write_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr
 	memcpy(buffer, &data[first_chunk], cend_i);
 }
 
-int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
+int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);
@@ -157,7 +157,7 @@ void _copy_read_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr_
 	memcpy(&data[first_chunk], buffer, cend_i);
 }
 
-int32_t read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
+int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);

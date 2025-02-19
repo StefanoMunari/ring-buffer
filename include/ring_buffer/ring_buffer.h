@@ -27,7 +27,7 @@ struct RingBuffer {
 extern const uint32_t WORD_SIZE;
 extern const struct RingBuffer RING_BUFFER_INVALID;
 
-struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
+struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
                                              addr_t *base_addr, uint32_t size);
 
 /**
@@ -36,13 +36,13 @@ struct RingBuffer make_ring_buffer_scattered(addr_t *cwrite_i, addr_t *cread_i,
  * @param size size of memory chunk
  * @return a ring buffer instance, RING_BUFFER_INVALID (buffer_size = 0) if fail
  */
-struct RingBuffer make_ring_buffer_linear(addr_t *base_addr, uint32_t size);
+struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size);
 
 /**
  * reset a ring buffer w/out deallocating mem which is not owned by ring buffer
  * @param ring_buffer the buffer to reset
  */
-void reset_ring_buffer(struct RingBuffer *ring_buffer);
+void ring_buffer_reset(struct RingBuffer *ring_buffer);
 
 /**
  * write size data into ring_buffer from cwrite_i position
@@ -51,11 +51,11 @@ void reset_ring_buffer(struct RingBuffer *ring_buffer);
  * @param size number of bytes to be written
  * @return number of bytes written, -1 otherwise
  */
-int32_t write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size);
+int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size);
 
 // read size data from ring_buffer cread_i position
 // return number of bytes read
-int32_t read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size);
+int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size);
 
 
 #endif //RING_BUFFER_H
