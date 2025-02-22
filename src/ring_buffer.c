@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 #include "ring_buffer/ring_buffer.h"
 #include <stdlib.h>
 #include <string.h>
