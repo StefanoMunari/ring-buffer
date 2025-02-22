@@ -1,0 +1,29 @@
+#include <ring_buffer/ring_buffer_version.h>
+
+const char *ring_buffer_get_version() {
+    return "@ring-buffer_VERSION@";
+}
+
+unsigned ring_buffer_get_version_major() {
+    return @ring-buffer_VERSION_MAJOR@+0u;
+}
+
+unsigned ring_buffer_get_version_minor() {
+    return @ring-buffer_VERSION_MINOR@+0u;
+}
+
+unsigned ring_buffer_get_version_patch() {
+    return @ring-buffer_VERSION_PATCH@+0u;
+}
+
+const char *ring_buffer_get_git_sha() {
+    return "@RINGBUFFER_GIT_SHA1@";
+}
+
+const char *ring_buffer_get_git_date() {
+    return "@RINGBUFFER_GIT_DATE@";
+}
+
+const char *ring_buffer_get_git_subject() {
+    return "@RINGBUFFER_GIT_COMMIT_SUBJECT@";
+}
