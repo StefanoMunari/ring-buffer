@@ -3,6 +3,9 @@
 #define RING_BUFFER_H
 
 #include <stdint.h>
+#ifdef RING_BUFFER_THREAD_SAFE
+#include <pthread.h>
+#endif //RING_BUFFER_THREAD_SAFE
 
 // Architecture addressing:
 // if none supported -> dont compile
@@ -29,6 +32,9 @@ struct RingBuffer {
 	addr_t *buffer;
 	// size of buffer in bytes
 	addr_t buffer_size;
+#ifdef RING_BUFFER_THREAD_SAFE
+	pthread_mutex_t *mutex;
+#endif //RING_BUFFER_THREAD_SAFE
 } __attribute__((packed, aligned(sizeof(addr_t))));
 
 extern const uint32_t WORD_SIZE;
@@ -52,7 +58,11 @@ extern const struct RingBuffer RING_BUFFER_INVALID;
  * NOTE: indexes (cwrite_i, cread_i) values ranges { 0, size-1 }
  */
 struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
-                                             addr_t *base_addr, uint32_t size);
+                                             addr_t *base_addr, uint32_t size
+#ifdef RING_BUFFER_THREAD_SAFE
+                                             ,pthread_mutex_t *mutex
+#endif //RING_BUFFER_THREAD_SAFE
+                                             );
 
 /**
  * creates a ring buffer from a chunk of allocated contiguous memory.
@@ -62,7 +72,11 @@ struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
  * @param size size of memory chunk
  * @return a ring buffer instance, RING_BUFFER_INVALID (buffer_size = 0) if fail
  */
-struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size);
+struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size
+#ifdef RING_BUFFER_THREAD_SAFE
+											, pthread_mutex_t *mutex
+#endif //RING_BUFFER_THREAD_SAFE
+											);
 
 /**
  * reset a ring buffer w/out deallocating mem which is not owned by ring buffer

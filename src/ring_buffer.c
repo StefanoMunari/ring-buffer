@@ -13,7 +13,11 @@ const struct RingBuffer RING_BUFFER_INVALID = {
 	buffer = NULL,
 	.
 	buffer_size =
-	0U
+	0U,
+#ifdef RING_BUFFER_THREAD_SAFE
+	.
+	mutex = NULL
+#endif //RING_BUFFER_THREAD_SAFE
 };
 // consts
 static const uint32_t LIN_BUFFER_OFFSET = WORD_SIZE * 2;
@@ -39,10 +43,18 @@ static uint8_t _cycle(addr_t addr)
 
 // public interface
 struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
-                                             addr_t *base_addr, uint32_t size)
+                                             addr_t *base_addr, uint32_t size
+#ifdef RING_BUFFER_THREAD_SAFE
+                                             , pthread_mutex_t *mutex
+#endif //RING_BUFFER_THREAD_SAFE
+                                             )
 {
 	if (cwrite_i == NULL || cread_i == NULL || base_addr == NULL || size <
-		WORD_SIZE * 2)
+		WORD_SIZE * 2
+#ifdef RING_BUFFER_THREAD_SAFE
+		|| mutex == NULL
+#endif //RING_BUFFER_THREAD_SAFE
+		)
 		return RING_BUFFER_INVALID;
 	return (struct RingBuffer){
 		.
@@ -53,12 +65,24 @@ struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
 		buffer = base_addr,
 		.
 		buffer_size = size,
+#ifdef RING_BUFFER_THREAD_SAFE
+		.
+		mutex = mutex
+#endif //RING_BUFFER_THREAD_SAFE
 	};
 }
 
-struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size)
+struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size
+#ifdef RING_BUFFER_THREAD_SAFE
+, pthread_mutex_t *mutex
+#endif //RING_BUFFER_THREAD_SAFE
+	)
 {
-	if (base_addr == NULL || size < (LIN_BUFFER_OFFSET + WORD_SIZE * 2))
+	if (base_addr == NULL || size < (LIN_BUFFER_OFFSET + WORD_SIZE * 2)
+#ifdef RING_BUFFER_THREAD_SAFE
+	|| mutex == NULL
+#endif //RING_BUFFER_THREAD_SAFE
+		)
 		return RING_BUFFER_INVALID;
 	return (struct RingBuffer){
 		.
@@ -69,6 +93,10 @@ struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size)
 		buffer = base_addr + LIN_BUFFER_OFFSET,
 		.
 		buffer_size = size - LIN_BUFFER_OFFSET,
+#ifdef RING_BUFFER_THREAD_SAFE
+		.
+		mutex = mutex
+#endif //RING_BUFFER_THREAD_SAFE
 	};
 }
 
@@ -129,6 +157,9 @@ void _copy_write_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr
 
 int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
+#ifdef RING_BUFFER_THREAD_SAFE
+	pthread_mutex_lock(ring_buffer->mutex);
+#endif
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);
 	const uint8_t rcycle = _cycle(cr_addr);
@@ -142,9 +173,16 @@ int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_
 		return -1; // invalid buffer
 	if (wcycle != rcycle && wi == ri)
 		return 0; // buffer is full
+#ifdef RING_BUFFER_THREAD_SAFE
+	const int32_t written = _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cwrite_i, ring_buffer->cread_i, data,
+		size, _copy_write, _copy_write_wrapped);
+	pthread_mutex_unlock(ring_buffer->mutex);
+	return written;
+#else
 	// x = write, y = read
 	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cwrite_i, ring_buffer->cread_i, data,
 		size, _copy_write, _copy_write_wrapped);
+#endif
 }
 
 void _copy_read(void *x_addr, uint8_t *data, uint32_t size) {
@@ -158,6 +196,9 @@ void _copy_read_wrapped(addr_t *buffer, void *x_addr, uint8_t *data, const addr_
 
 int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
+#ifdef RING_BUFFER_THREAD_SAFE
+	pthread_mutex_lock(ring_buffer->mutex);
+#endif
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);
 	const uint8_t rcycle = _cycle(cr_addr);
@@ -171,7 +212,14 @@ int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t
 		return -1; // invalid buffer
 	if (ring_buffer->cread_i == ring_buffer->cwrite_i)
 		return 0; // buffer is empty
+#ifdef RING_BUFFER_THREAD_SAFE
+	const int32_t read = _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cread_i, ring_buffer->cwrite_i, data,
+		size, _copy_read, _copy_read_wrapped);
+	pthread_mutex_unlock(ring_buffer->mutex);
+	return read;
+#else
 	// x = read, y = write
 	return _transfer(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cread_i, ring_buffer->cwrite_i, data,
 		size, _copy_read, _copy_read_wrapped);
+#endif
 }
