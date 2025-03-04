@@ -33,7 +33,10 @@ set(RBUFF_HEADERS include/)
 file(GLOB_RECURSE SOURCES "src/*.c")
 add_library(${RBUFF_LIB} ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/ring_buffer_version.c)
 target_include_directories(${RBUFF_LIB} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/${RBUFF_HEADERS})
-target_compile_definitions(${RBUFF_LIB} PRIVATE RING_BUFFER_THREAD_SAFE=${CMAKE_RING_BUFFER_THREAD_SAFE})
+
+if (${CMAKE_RING_BUFFER_THREAD_SAFE})
+    target_compile_definitions(${RBUFF_LIB} PRIVATE RING_BUFFER_THREAD_SAFE=${CMAKE_RING_BUFFER_THREAD_SAFE})
+endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/ring_buffer_example.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/ring_buffer_test.cmake)

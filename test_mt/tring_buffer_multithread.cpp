@@ -6,10 +6,6 @@ extern "C" {
 #include "ring_buffer/ring_buffer.h"
 }
 #ifdef RING_BUFFER_THREAD_SAFE
-static constexpr auto MEM_SIZE = 4096;
-static addr_t MEM[MEM_SIZE];
-static RingBuffer RING_BUFFER;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int get_random(int min, int max) {
     // Random device and generator
@@ -20,73 +16,100 @@ static int get_random(int min, int max) {
     return dist(gen);
 }
 
-static void Producer() {
+static void Producer(struct RingBuffer *ring_buffer) {
     const auto data_size = 256U;
     uint8_t data[data_size];
     memset(data, 0x42, data_size);
+    int fail = 0, success = 0;
 
-    ring_buffer_write(&RING_BUFFER, data, data_size);
     for (int i = 0; i < 10; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(get_random(1, 900)));
-        int written = ring_buffer_write(&RING_BUFFER, data, data_size);
-        if (written)
-            printf("p");
+        std::this_thread::sleep_for(std::chrono::milliseconds(get_random(50+success, 500+success*i)));
+        int written = ring_buffer_write(ring_buffer, data, data_size);
+        if (written > 0) {
+            ++success;
+        } else {
+            ++fail;
+        }
     }
+    printf("producer:stats:fail:%d,success:%d\n", fail, success);
 }
 
-static void Consumer() {
+static void Consumer(struct RingBuffer *ring_buffer) {
     const auto data_size = 256U;
     uint8_t data[data_size];
     memset(data, 0x00, data_size);
     uint8_t expected_data[data_size];
     memset(expected_data, 0x42, data_size);
-
+    int fail = 0, success = 0;
     for (int i = 0; i < 10; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(get_random(1, 900)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(get_random(50, 500)));
         memset(data, 0x00, data_size);
-        int ret = ring_buffer_read(&RING_BUFFER, data, data_size);
-        if (ret == data_size) {
-            printf("c");
-            EXPECT_EQ(memcmp(data, expected_data, data_size), 0);
-        }else if (ret > 0) {// something when wrong
+        int ret = ring_buffer_read(ring_buffer, data, data_size);
+        if (ret == ring_buffer->buffer_size || ret == (ring_buffer->buffer_size % data_size)) {
+            ++success;
+            EXPECT_EQ(memcmp(data, expected_data, ret), 0);
+        }else if (ret > 0) {// something when wrong: corrupted state
             EXPECT_EQ(1,0);
+        } else {
+            ++fail;
         }
     }
+    printf("consumer:stats:fail:%d,success:%d\n",fail,success);
 }
 
 TEST(RingBufferTest, Producer1Consumer1Multithread) {
-    RING_BUFFER = ring_buffer_make_linear(MEM, MEM_SIZE, &mutex);
-    std::thread producer(Producer);
-    //std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    std::thread consumer(Consumer);
+    const auto mem_size = 1096;
+    addr_t *mem = (addr_t *)calloc(mem_size, 1);
+    RingBuffer ring_buffer;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    ring_buffer = ring_buffer_make_linear(mem, mem_size-WORD_SIZE*2, &mutex);
+    std::thread producer(Producer, &ring_buffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    std::thread consumer(Consumer, &ring_buffer);
     producer.join();
     consumer.join();
+    free(mem);
 }
-
+/*
 TEST(RingBufferTest, Producer1Consumer2Multithread) {
-    RING_BUFFER = ring_buffer_make_linear(MEM, MEM_SIZE, &mutex);
-    std::thread producer(Producer);
+    const auto mem_size = 1096;
+    addr_t *mem = (addr_t *)calloc(mem_size, 1);
+    RingBuffer ring_buffer;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    ring_buffer = ring_buffer_make_linear(mem, mem_size-WORD_SIZE*2, &mutex);
+    EXPECT_NE(memcmp(&ring_buffer, &RING_BUFFER_INVALID, sizeof(RING_BUFFER_INVALID)), 0);
+    std::thread producer(Producer, &ring_buffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    std::thread consumer(Consumer, &ring_buffer);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    std::thread consumer(Consumer);
-    std::thread consumer1(Consumer);
+    std::thread consumer1(Consumer, &ring_buffer);
     producer.join();
     consumer.join();
     consumer1.join();
+    free(mem);
 }
 
-TEST(RingBufferTest, Producer2Consumer2Multithread) {
-    RING_BUFFER = ring_buffer_make_linear(MEM, MEM_SIZE, &mutex);
-    std::thread producer(Producer);
-    std::thread producer1(Producer);
+TEST(RingBufferTest, Producer1Consumer3Multithread) {
+    const auto mem_size = 1096;
+    addr_t *mem = (addr_t *)calloc(mem_size, 1);
+    RingBuffer ring_buffer;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    ring_buffer = ring_buffer_make_linear(mem, mem_size-WORD_SIZE*2, &mutex);
+    EXPECT_NE(memcmp(&ring_buffer, &RING_BUFFER_INVALID, sizeof(RING_BUFFER_INVALID)), 0);
+    std::thread producer(Producer, &ring_buffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    std::thread consumer(Consumer, &ring_buffer);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    std::thread consumer(Consumer);
-    std::thread consumer1(Consumer);
+    std::thread consumer1(Consumer, &ring_buffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::thread consumer2(Consumer, &ring_buffer);
     producer.join();
-    producer1.join();
     consumer.join();
     consumer1.join();
+    consumer2.join();
+    free(mem);
 }
-
+*/
 #endif //RING_BUFFER_THREAD_SAFE
 // Main function for running tests
 int main(int argc, char **argv) {

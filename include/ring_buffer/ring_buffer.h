@@ -11,9 +11,10 @@
 // if none supported -> dont compile
 #if __SIZEOF_POINTER__ == 8
 typedef uint64_t addr_t;
-#endif
-#if __SIZEOF_POINTER__ == 4
+#elif __SIZEOF_POINTER__ == 4
 typedef uint32_t addr_t;
+#else
+#error "Unsupported pointer size"
 #endif
 
 /**
@@ -35,7 +36,14 @@ struct RingBuffer {
 #ifdef RING_BUFFER_THREAD_SAFE
 	pthread_mutex_t *mutex;
 #endif //RING_BUFFER_THREAD_SAFE
-} __attribute__((packed, aligned(sizeof(addr_t))));
+} __attribute__((aligned(
+#ifdef RING_BUFFER_THREAD_SAFE
+	__BIGGEST_ALIGNMENT__
+#else
+	sizeof(addr_t)
+#endif
+)));
+
 
 extern const uint32_t WORD_SIZE;
 /**
@@ -54,6 +62,7 @@ extern const struct RingBuffer RING_BUFFER_INVALID;
  * @param cread_i: read index which contains also cycle (flag to signal if last read wrapped in ring buffer)
  * @param base_addr: ptr to start of buffer allocated memory
  * @param size: size of buffer to use
+ * note: expects an initialized mutex to be injected
  * @return a ring buffer instance initialized with input parameters, RING_BUFFER_INVALID (buffer_size = 0) if fail
  * NOTE: indexes (cwrite_i, cread_i) values ranges { 0, size-1 }
  */
@@ -70,6 +79,7 @@ struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
  * remaining is used for buffer itself
  * @param base_addr base address of memory chunk
  * @param size size of memory chunk
+ * note: expects an initialized mutex to be injected
  * @return a ring buffer instance, RING_BUFFER_INVALID (buffer_size = 0) if fail
  */
 struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size
@@ -80,6 +90,7 @@ struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size
 
 /**
  * reset a ring buffer w/out deallocating mem which is not owned by ring buffer
+ * note: dont reset mutex
  * @param ring_buffer the buffer to reset
  */
 void ring_buffer_reset(struct RingBuffer *ring_buffer);
