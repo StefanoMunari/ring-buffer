@@ -134,7 +134,7 @@ int32_t transfer__(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, a
 	// y info: the index which handles the other transfer op type
 	const addr_t cy_addr = *(cy_index);
 	const uint8_t ycycle = cycle__(cy_addr);
-	const uint8_t yi = index__(cy_addr);
+	const addr_t yi = index__(cy_addr);
 	// x info: the index which handles the requested transfer type
 	const addr_t cx_addr = *(cx_index);
 	uint8_t xcycle = cycle__(cx_addr);
@@ -147,7 +147,7 @@ int32_t transfer__(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, a
 	addr_t x_addr = (addr_t)buffer + xi;
 
 	addr_t cend_i = unwrapped_xsize % buffer_size;
-	if (cend_i > 0 && cend_i != unwrapped_xsize) {// wrapped/cycled
+	if (cend_i >= 0 && cend_i != unwrapped_xsize) {// wrapped/cycled
 		if (xcycle == ycycle && cend_i > yi) {
 			cend_i = yi;// capped by y index
 		}
@@ -156,14 +156,16 @@ int32_t transfer__(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, a
 		// printf("\ns:%u,x:%p,b:%p,f:%u,xi:%u,yi:%u\n", buffer_size, (void *)x_addr, (void *)buffer, first_chunk, xi, yi);
 		cp_wrp_cback(buffer, (addr_t *)x_addr, data, first_chunk, cend_i);
 		// update cycle x index
-		*(cx_index) = cend_i % buffer_size | CYCLE_MASK;
+		*(cx_index) = cend_i % buffer_size;
+		*(cx_index) |= (((~xcycle) << INDEX_SIZE) & CYCLE_MASK);
 		return first_chunk + cend_i;
 	}
 	if (xi < yi && xi + size > yi)
 		size = yi;// capped by y index
 	cp_cback((addr_t *)x_addr, data, size);
 	// update cycle x index
-	*(cx_index) = ((xi + size) % buffer_size & ~CYCLE_MASK);
+	*(cx_index) = (xi + size) % buffer_size;
+	*(cx_index) |= ((xcycle << INDEX_SIZE) & CYCLE_MASK);
 	return size;
 }
 
@@ -241,13 +243,13 @@ int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t
 	uint8_t wcycle = cycle__(cw_addr);
 	const addr_t wi = index__(cw_addr);
 
-	if ((rcycle != wcycle && ri < wi) || (rcycle == wcycle && wi < ri)) {
+	if (rcycle == wcycle && wi < ri) {
 #ifdef RING_BUFFER_THREAD_SAFE
 		pthread_mutex_unlock(ring_buffer->mutex);
 #endif
 		return -1; // invalid buffer
 	}
-	if (ring_buffer->cread_i == ring_buffer->cwrite_i) {
+	if (*ring_buffer->cread_i == *ring_buffer->cwrite_i) {
 #ifdef RING_BUFFER_THREAD_SAFE
 		pthread_mutex_unlock(ring_buffer->mutex);
 #endif

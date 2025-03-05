@@ -7,6 +7,14 @@
 static const int mem_size = 64;
 static addr_t *mem = NULL;
 static struct RingBuffer rb;
+#if __SIZEOF_POINTER__ == 8
+static const uint8_t INDEX_SIZE = 63U;
+static const addr_t CYCLE_MASK = (1ULL << INDEX_SIZE); // set 64th bit
+#endif
+#if __SIZEOF_POINTER__ == 4
+static const uint8_t INDEX_SIZE = 31U;
+static const addr_t CYCLE_MASK = (1UL << INDEX_SIZE) // set 32nd bit
+#endif
 
 void setUp(void) {
   // Set up code for each test
@@ -120,6 +128,56 @@ void trbuf_write_read_wrapped(void) {
   TEST_ASSERT_EQUAL_MEMORY(write_buf, read_buf, wrapped_size);
 }
 
+void trbuf_write_read_perfect_wrap(void) {
+  int wrapped_size =  rb.buffer_size;
+  int32_t expected_size0 = rb.buffer_size;
+  uint8_t write_buf[wrapped_size];
+  memset(write_buf, 0x42, wrapped_size);
+  uint8_t read_buf[wrapped_size];
+  memset(read_buf, 0x00, wrapped_size);
+  // WRITE
+  int32_t result = ring_buffer_write(&rb, write_buf, wrapped_size);
+  TEST_ASSERT_EQUAL(result, expected_size0);
+  // check wrapped & index = 0
+  TEST_ASSERT_EQUAL(*rb.cwrite_i, CYCLE_MASK);
+  // READ
+  result = ring_buffer_read(&rb, read_buf, wrapped_size);
+  TEST_ASSERT_EQUAL(result, expected_size0);
+  TEST_ASSERT_EQUAL_MEMORY(write_buf, read_buf, expected_size0);
+  // check wrapped & index = 0
+  TEST_ASSERT_EQUAL(*rb.cread_i, CYCLE_MASK);
+}
+
+void trbuf_write_read_wrap_many_times(void) {
+  int wrapped_size =  rb.buffer_size*2 + 3;
+  int32_t expected_size0 = rb.buffer_size;
+  uint8_t write_buf[wrapped_size];
+  memset(write_buf, 0x42, wrapped_size);
+  uint8_t read_buf[wrapped_size];
+  memset(read_buf, 0x00, wrapped_size);
+  // WRITE
+  int32_t result = ring_buffer_write(&rb, write_buf, wrapped_size);
+  result = ring_buffer_write(&rb, write_buf, wrapped_size);
+  TEST_ASSERT_EQUAL(result, 0);
+  // READ
+  result = ring_buffer_read(&rb, read_buf, wrapped_size);
+  TEST_ASSERT_EQUAL(result, expected_size0);
+  TEST_ASSERT_EQUAL_MEMORY(write_buf, read_buf, expected_size0);
+  result = ring_buffer_read(&rb, read_buf, wrapped_size);
+  TEST_ASSERT_EQUAL(result, 0);
+  // ACTUALLY WRAP MANY TIMES
+  memset(read_buf, 0x00, wrapped_size);
+  ring_buffer_write(&rb, write_buf, expected_size0-1);
+  ring_buffer_read(&rb, read_buf, expected_size0-1);
+  memset(read_buf, 0x00, wrapped_size);
+  write_buf[0] = 0x01;
+  result = ring_buffer_write(&rb, write_buf, 3);
+  TEST_ASSERT_EQUAL(result, 3);
+  result = ring_buffer_read(&rb, read_buf, 3);
+  TEST_ASSERT_EQUAL(result, 3);
+  TEST_ASSERT_EQUAL_MEMORY(write_buf, read_buf, 3);
+}
+
 int main(void) {
   UNITY_BEGIN();
   RUN_TEST(trbuf_ctor_linear);
@@ -131,5 +189,7 @@ int main(void) {
   RUN_TEST(trbuf_write_read_notwrapped);
   RUN_TEST(trbuf_write_read_notwrapped_fail);
   RUN_TEST(trbuf_write_read_wrapped);
+  RUN_TEST(trbuf_write_read_perfect_wrap);
+  RUN_TEST(trbuf_write_read_wrap_many_times);
   return UNITY_END();
 }

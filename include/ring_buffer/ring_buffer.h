@@ -19,8 +19,10 @@ typedef uint32_t addr_t;
 
 /**
  * Ring buffer structure:
- * cwrite_i: ptr to write index (0, size -1) which MSb is used as cycle flag (0=write !wrapped, 1=write wrapped)
- * cread_i: ptr to read index (0, size -1) which MSb is used as cycle flag (0=read !wrapped, 1=read wrapped)
+ * cwrite_i: ptr to write index (0, size -1) which MSb is used as cycle flag (changes when wrapping).
+ * Indicates the next byte to be written.
+ * cread_i: ptr to read index (0, size -1) which MSb is used as cycle flag (changes when wrapping).
+ * Indicates the next byte to be read.
  * buffer: ptr to actual buffer used to store data in ring buffer
  * buffer_size: size of buffer in bytes
  */
@@ -36,13 +38,7 @@ struct RingBuffer {
 #ifdef RING_BUFFER_THREAD_SAFE
 	pthread_mutex_t *mutex;
 #endif //RING_BUFFER_THREAD_SAFE
-} __attribute__((aligned(
-#ifdef RING_BUFFER_THREAD_SAFE
-	__BIGGEST_ALIGNMENT__
-#else
-	sizeof(addr_t)
-#endif
-)));
+} __attribute__((aligned(sizeof(addr_t))));
 
 
 extern const uint32_t WORD_SIZE;
@@ -58,8 +54,8 @@ extern const struct RingBuffer RING_BUFFER_INVALID;
  * cread_i (read index) = 0x0C008000
  * base_addr (buffer ptr) = 0x0B000000
  * size (of buffer) = 0x200
- * @param cwrite_i: write index which contains also cycle (flag to signal if last write wrapped in ring buffer)
- * @param cread_i: read index which contains also cycle (flag to signal if last read wrapped in ring buffer)
+ * @param cwrite_i: write index which contains also cycle (signal if last write wrapped in ring buffer)
+ * @param cread_i: read index which contains also cycle (signal if last read wrapped in ring buffer)
  * @param base_addr: ptr to start of buffer allocated memory
  * @param size: size of buffer to use
  * note: expects an initialized mutex to be injected
