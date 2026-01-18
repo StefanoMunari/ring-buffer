@@ -10,6 +10,8 @@ target_sources(ring_buffer_test PRIVATE ${unity_SOURCE_DIR}/src/unity.c)
 target_include_directories(ring_buffer_test PRIVATE ${unity_SOURCE_DIR}/src ${RBUFF_HEADERS})
 # Link library to be tested
 target_link_libraries(ring_buffer_test PRIVATE ${RBUFF_LIB})
+# sanitizer
+target_use_mem_sanitizer(ring_buffer_test ${RBUFF_TEST_CMEM_SANITIZER})
 
 # Add the test to CTest
 add_test(NAME RingBufferTest COMMAND ring_buffer_test)

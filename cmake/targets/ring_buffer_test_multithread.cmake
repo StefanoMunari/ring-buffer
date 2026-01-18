@@ -10,6 +10,8 @@ if(RING_BUFFER_CPP_UNIT_TESTS)
     target_compile_definitions(ring_buffer_test_multithread PRIVATE RING_BUFFER_THREAD_SAFE=${CMAKE_RING_BUFFER_THREAD_SAFE})
     target_compile_options(ring_buffer_test_multithread PRIVATE -fsanitize=thread)
     target_link_options(ring_buffer_test_multithread PRIVATE -fsanitize=thread)
+    # sanitizer
+    target_use_mem_sanitizer(ring_buffer_test_multithread ${RBUFF_TESTMT_CMEM_SANITIZER})
 
     add_test(NAME test_ring_buffer_cpp COMMAND ring_buffer_test_multithread)
     # Enable XML report

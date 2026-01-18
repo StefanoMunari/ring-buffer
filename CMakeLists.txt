@@ -10,7 +10,10 @@ set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # default overridable variables (pass -D<NAME_VAR>=VALUE in CMAKE profile)
 set(RBUFF_CLANG_TIDY "ON" CACHE BOOL "")
-set(RBUFF_CMEM_SANITIZER "ON" CACHE BOOL "")
+set(RBUFF_CMEM_SANITIZER "OFF" CACHE BOOL "")
+set(RBUFF_EXAMPLE_CMEM_SANITIZER "OFF" CACHE BOOL "")
+set(RBUFF_TEST_CMEM_SANITIZER "OFF" CACHE BOOL "")
+set(RBUFF_TESTMT_CMEM_SANITIZER "OFF" CACHE BOOL "")
 #=============================
 # Version
 #=============================
@@ -37,6 +40,8 @@ target_include_directories(${RBUFF_LIB} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/${RBU
 if (${CMAKE_RING_BUFFER_THREAD_SAFE})
     target_compile_definitions(${RBUFF_LIB} PRIVATE RING_BUFFER_THREAD_SAFE=${CMAKE_RING_BUFFER_THREAD_SAFE})
 endif()
+
+target_use_mem_sanitizer(${RBUFF_LIB} ${RBUFF_CMEM_SANITIZER})
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/ring_buffer_example.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/ring_buffer_test.cmake)

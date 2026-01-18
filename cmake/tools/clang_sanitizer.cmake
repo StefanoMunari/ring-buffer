@@ -1,6 +1,6 @@
 # reference: https://clang.llvm.org/docs/MemorySanitizer.html
 function(target_use_mem_sanitizer target enable)
-    if (NOT ${enable})
+    if (NOT enable)
         return()
     endif()
     message(STATUS "${target} compiled with address sanitizer")
