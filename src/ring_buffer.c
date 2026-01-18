@@ -17,7 +17,7 @@ const struct RingBuffer RING_BUFFER_INVALID = {
 	0U,
 #ifdef RING_BUFFER_THREAD_SAFE
 	.
-	mutex = NULL
+	mutex = 0U
 #endif //RING_BUFFER_THREAD_SAFE
 };
 // consts
@@ -39,76 +39,47 @@ static addr_t index__(addr_t addr)
 
 static uint8_t cycle__(addr_t addr)
 {
-	return addr >> INDEX_SIZE;
+	return (addr & CYCLE_MASK) ? 1 : 0;
 }
 
 // public interface
-struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i,
-                                             addr_t *base_addr, uint32_t size
-#ifdef RING_BUFFER_THREAD_SAFE
-                                             , pthread_mutex_t *mutex
-#endif //RING_BUFFER_THREAD_SAFE
-                                             )
+struct RingBuffer ring_buffer_make_scattered(addr_t *cwrite_i, addr_t *cread_i, addr_t *base_addr, uint32_t size)
 {
-	if (cwrite_i == NULL || cread_i == NULL || base_addr == NULL || size <
-		WORD_SIZE * 2
-#ifdef RING_BUFFER_THREAD_SAFE
-		|| mutex == NULL
-#endif //RING_BUFFER_THREAD_SAFE
-		)
+	if (cwrite_i == NULL || cread_i == NULL || base_addr == NULL || size < WORD_SIZE * 2)
 		return RING_BUFFER_INVALID;
-	*base_addr = 0U;
-	*(base_addr + WORD_SIZE) = 0U;
-	return (struct RingBuffer){
-		.
-		cwrite_i = cwrite_i,
-		.
-		cread_i = cread_i,
-		.
-		buffer = base_addr,
-		.
-		buffer_size = size,
+	struct RingBuffer rb = {
+		.cwrite_i = cwrite_i,
+		.cread_i = cread_i,
+		.buffer = base_addr,
+		.buffer_size = size,
+};
 #ifdef RING_BUFFER_THREAD_SAFE
-		.
-		mutex = mutex
-#endif //RING_BUFFER_THREAD_SAFE
-	};
+	pthread_mutex_init(&rb.mutex, NULL);
+#endif
+	return rb;
 }
 
-struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size
-#ifdef RING_BUFFER_THREAD_SAFE
-, pthread_mutex_t *mutex
-#endif //RING_BUFFER_THREAD_SAFE
-	)
+struct RingBuffer ring_buffer_make_linear(addr_t *base_addr, uint32_t size)
 {
-	if (base_addr == NULL || size < (LIN_BUFFER_OFFSET + WORD_SIZE * 2)
-#ifdef RING_BUFFER_THREAD_SAFE
-	|| mutex == NULL
-#endif //RING_BUFFER_THREAD_SAFE
-		)
+	if (base_addr == NULL || size < (LIN_BUFFER_OFFSET + WORD_SIZE * 2))
 		return RING_BUFFER_INVALID;
-	*base_addr = 0U;
-	*(base_addr + WORD_SIZE) = 0U;
-	return (struct RingBuffer){
-		.
-		cwrite_i = base_addr,
-		.
-		cread_i = base_addr + WORD_SIZE,
-		.
-		buffer = base_addr + LIN_BUFFER_OFFSET,
-		.
-		buffer_size = size - LIN_BUFFER_OFFSET,
+	struct RingBuffer rb = {
+		.cwrite_i = base_addr,
+		.cread_i = base_addr + 1,
+		.buffer = base_addr + 2,
+		.buffer_size = size - LIN_BUFFER_OFFSET,
+};
+
 #ifdef RING_BUFFER_THREAD_SAFE
-		.
-		mutex = mutex
-#endif //RING_BUFFER_THREAD_SAFE
-	};
+	pthread_mutex_init(&rb.mutex, NULL);
+#endif
+	return rb;
 }
 
 void ring_buffer_reset(struct RingBuffer *ring_buffer)
 {
 #ifdef RING_BUFFER_THREAD_SAFE
-	pthread_mutex_lock(ring_buffer->mutex);
+	pthread_mutex_lock(&ring_buffer->mutex);
 #endif
 	if (ring_buffer->cwrite_i)
 		*ring_buffer->cwrite_i = 0x00;
@@ -120,7 +91,7 @@ void ring_buffer_reset(struct RingBuffer *ring_buffer)
 	ring_buffer->cread_i = NULL;
 	ring_buffer->buffer = NULL;
 #ifdef RING_BUFFER_THREAD_SAFE
-	pthread_mutex_unlock(ring_buffer->mutex);
+	pthread_mutex_unlock(&ring_buffer->mutex);
 #endif
 }
 
@@ -181,7 +152,7 @@ void copy_write_wrapped__(addr_t *buffer, addr_t *x_addr, uint8_t *data, const a
 int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
 #ifdef RING_BUFFER_THREAD_SAFE
-	pthread_mutex_lock(ring_buffer->mutex);
+	pthread_mutex_lock(&ring_buffer->mutex);
 #endif
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);
@@ -194,20 +165,20 @@ int32_t ring_buffer_write(struct RingBuffer *ring_buffer, uint8_t *data, uint32_
 
 	if ((wcycle == rcycle && wi < ri) || (wcycle != rcycle && wi > ri)) {
 #ifdef RING_BUFFER_THREAD_SAFE
-		pthread_mutex_unlock(ring_buffer->mutex);
+		pthread_mutex_unlock(&ring_buffer->mutex);
 #endif
 		return -1; // invalid buffer
 	}
 	if (wcycle != rcycle && wi == ri) {
 #ifdef RING_BUFFER_THREAD_SAFE
-		pthread_mutex_unlock(ring_buffer->mutex);
+		pthread_mutex_unlock(&ring_buffer->mutex);
 #endif
 		return 0; // buffer is full
 	}
 #ifdef RING_BUFFER_THREAD_SAFE
 	const int32_t written = transfer__(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cwrite_i, ring_buffer->cread_i, data,
 		size, copy_write__, copy_write_wrapped__);
-	pthread_mutex_unlock(ring_buffer->mutex);
+	pthread_mutex_unlock(&ring_buffer->mutex);
 	return written;
 #else
 	// x = write, y = read
@@ -230,7 +201,7 @@ void copy_read_wrapped__(addr_t *buffer, addr_t *x_addr, uint8_t *data, const ad
 int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t size)
 {
 #ifdef RING_BUFFER_THREAD_SAFE
-	pthread_mutex_lock(ring_buffer->mutex);
+	pthread_mutex_lock(&ring_buffer->mutex);
 #endif
 	// read info
 	const addr_t cr_addr = *(ring_buffer->cread_i);
@@ -243,20 +214,20 @@ int32_t ring_buffer_read(struct RingBuffer *ring_buffer, uint8_t *data, uint32_t
 
 	if ((rcycle != wcycle && ri < wi) || (rcycle == wcycle && wi < ri)) {
 #ifdef RING_BUFFER_THREAD_SAFE
-		pthread_mutex_unlock(ring_buffer->mutex);
+		pthread_mutex_unlock(&ring_buffer->mutex);
 #endif
 		return -1; // invalid buffer
 	}
 	if (ring_buffer->cread_i == ring_buffer->cwrite_i) {
 #ifdef RING_BUFFER_THREAD_SAFE
-		pthread_mutex_unlock(ring_buffer->mutex);
+		pthread_mutex_unlock(&ring_buffer->mutex);
 #endif
 		return 0; // buffer is empty
 	}
 #ifdef RING_BUFFER_THREAD_SAFE
 	const int32_t read = transfer__(ring_buffer->buffer, ring_buffer->buffer_size, ring_buffer->cread_i, ring_buffer->cwrite_i, data,
 		size, copy_read__, copy_read_wrapped__);
-	pthread_mutex_unlock(ring_buffer->mutex);
+	pthread_mutex_unlock(&ring_buffer->mutex);
 	return read;
 #else
 	// x = read, y = write

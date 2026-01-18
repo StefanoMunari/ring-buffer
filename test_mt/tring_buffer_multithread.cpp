@@ -45,11 +45,12 @@ static void Consumer(struct RingBuffer *ring_buffer) {
         std::this_thread::sleep_for(std::chrono::milliseconds(get_random(50, 500)));
         memset(data, 0x00, data_size);
         int ret = ring_buffer_read(ring_buffer, data, data_size);
-        if (ret == ring_buffer->buffer_size || ret == (ring_buffer->buffer_size % data_size)) {
+        // printf("rbs:%lu,ds:%d\n",ring_buffer->buffer_size,data_size);
+        if (ret == data_size || ret == (ring_buffer->buffer_size % data_size)) {
             ++success;
             EXPECT_EQ(memcmp(data, expected_data, ret), 0);
         }else if (ret > 0) {// something when wrong: corrupted state
-            EXPECT_EQ(1,0);
+            EXPECT_EQ(ret,0);
         } else {
             ++fail;
         }
@@ -68,7 +69,7 @@ TEST(RingBufferTest, Producer1Consumer1Multithread) {
     std::thread consumer(Consumer, &ring_buffer);
     producer.join();
     consumer.join();
-    free(mem);
+    // free(mem);
 }
 /*
 TEST(RingBufferTest, Producer1Consumer2Multithread) {
