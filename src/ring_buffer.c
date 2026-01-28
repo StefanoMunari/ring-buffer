@@ -128,7 +128,7 @@ int32_t transfer__(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, a
 		cp_wrp_cback(buffer, (addr_t *)x_addr, data, first_chunk, cend_i);
 		// update cycle x index
 		*(cx_index) = cend_i % buffer_size;
-		*(cx_index) |= (((~xcycle) << INDEX_SIZE) & CYCLE_MASK);
+		*(cx_index) |= (((addr_t)(!xcycle) << INDEX_SIZE) & CYCLE_MASK);
 		return first_chunk + cend_i;
 	}
 	if (xi < yi && xi + size > yi)
@@ -136,7 +136,7 @@ int32_t transfer__(addr_t *buffer, const addr_t buffer_size, addr_t *cx_index, a
 	cp_cback((addr_t *)x_addr, data, size);
 	// update cycle x index
 	*(cx_index) = (xi + size) % buffer_size;
-	*(cx_index) |= ((xcycle << INDEX_SIZE) & CYCLE_MASK);
+	*(cx_index) |= (((addr_t)xcycle << INDEX_SIZE) & CYCLE_MASK);
 	return size;
 }
 
