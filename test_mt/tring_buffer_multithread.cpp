@@ -53,7 +53,7 @@ static void Consumer(struct RingBuffer *ring_buffer)
 						++success;
 						EXPECT_EQ(memcmp(data, expected_data, ret), 0);
 				} else if (ret > 0) {
-						// something when wrong: corrupted state
+						// something went wrong: corrupted state
 						printf("rbs:%lu,ds:%d\n", ring_buffer->buffer_size, data_size);
 						EXPECT_EQ(ret, 0);
 				} else {
